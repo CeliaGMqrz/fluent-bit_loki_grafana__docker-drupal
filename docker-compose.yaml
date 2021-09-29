@@ -1,0 +1,132 @@
+version: '3.7'
+
+services:
+  db:
+    container_name: mysql_c
+    image: ${MYSQL_IMAGE}
+    volumes:
+    - type: volume
+      source: drupaldatabase
+      target: /var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    networks:
+      - milocal
+    logging:
+      driver: fluentd
+      options:
+        fluentd-async-connect: "true"
+        fluentd-address: localhost:24224
+        tag: bd.logs
+  
+  nginx:
+    container_name: nginx_c
+    image: ${NGINX_IMAGE}
+    volumes:
+    - type: volume
+      source: staticfiles
+      target: /var/www/html
+    environment:
+      NGINX_BACKEND_PORT: 9000
+      NGINX_SERVER_NAME: localhost
+      NGINX_BACKEND_HOST: php
+      PROJECT_NAME: ${PROJECT_NAME}
+    networks:
+      - milocal
+    ports:
+     - 80:80
+     - 443:443
+    depends_on:
+      - "php"
+      - "fluentd"
+    logging:
+      driver: fluentd
+      options:
+        fluentd-async-connect: "true"
+        fluentd-address: localhost:24224
+        tag: nginx.logs
+
+  php:
+    container_name: drupal_c
+    image: ${DRUPAL_IMAGE}
+    volumes:
+    - type: volume
+      source: staticfiles
+      target: /opt/drupal/web
+    environment:
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_HOST: mysql_c
+      MYSQL_PORT: 3306
+      PROJECT_NAME: ${PROJECT_NAME}
+      PROJECT_BASE_DOMAIN: ${PROJECT_BASE_DOMAIN}
+    networks:
+      - milocal
+    depends_on:
+      - "db"
+    logging:
+      driver: fluentd
+      options:
+        fluentd-async-connect: "true"
+        fluentd-address: localhost:24224
+        tag: drupal.logs
+
+  loki:
+    image: grafana/loki
+    container_name: loki
+    ports:
+      - "3100:3100" 
+    networks:
+      - milocal
+
+
+  fluentd:
+    container_name: fluentd
+    image: grafana/fluent-bit-plugin-loki
+    ports:
+      - 24224:24224
+      - 24224:24224/udp
+    environment:
+      LOKI_URL: http://loki:3100/loki/api/v1/push
+    volumes:
+      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+    networks:
+      - milocal
+
+  grafana:
+    image: grafana/grafana:7.2.2
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    networks:
+      - milocal
+    depends_on:
+      - loki
+    volumes:
+      - ./grafana/configs/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      
+volumes:
+  staticfiles:
+    driver: local
+    driver_opts:
+      type: none
+      device: ./storage/files
+      o: bind
+  drupaldatabase:
+    driver: local
+    driver_opts:
+      type: none
+      device: ./storage/mysql
+      o: bind
+
+networks:
+  milocal:
+    driver: bridge
+
