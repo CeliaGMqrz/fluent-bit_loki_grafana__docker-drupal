@@ -83,7 +83,7 @@ En el fichero yml está expuesto de la siguiente forma:
 
 `fluent-bit.conf`
 
-En el fichero de configuración de fluent indicamos la Url de Loki que la hemos indicado en las variables de entorno del fichero yml. Y las etiquetas que queramos, en este caso está separado por nombre de contenedor.
+En el fichero de configuración de fluent indicamos la Url de Loki que la hemos indicado en las variables de entorno del fichero yml. Y las etiquetas que queramos, en este caso está separado por **nombre de contenedor**.
 
 ```shell
 . . . 
@@ -153,12 +153,12 @@ nginx_c    /bin/bash /assets/bin/dock ...   Up      0.0.0.0:443->443/tcp,:::443-
 
 ### Si entramos a Grafana http://localhost:3000
 
-Indicamos las credenciales y podemos ver el Dashboard de Grafana. Accedemos a la Configuración >> Data Sources
+Indicamos las credenciales y podemos ver el Dashboard de Grafana. Accedemos a la `Configuración` >> `Data Sources`
 
 ![grafana1.png](/images/grafana1.png)
 
 
-Como podemos comprobar se ha añadido el plugin de loki, ya que se lo hemos añadido en el fichero `datasource.yml`
+Como podemos comprobar se ha añadido el datasource de loki, ya que se lo hemos añadido en el fichero `datasource.yml`
 
 ![grafana2.png](/images/grafana2.png)
 
@@ -168,4 +168,7 @@ Ahora vamos a `Explore` y comprobamos que tenemos todos los registros por cada c
 ![logs.png](/images/logs.png)
 
 
+Además, podemos hacer consultas más específicas añadiendo filtros según el [lenguaje LogQL](https://grafana.com/docs/loki/latest/logql/#line-filter-expression) de Loki(Grafana). Como en el siguiente ejemplo filtrando por página no encontrada con error (404).
+
+![filtro.png](/images/filtro.png)
 

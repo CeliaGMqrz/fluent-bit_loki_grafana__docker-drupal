@@ -1,6 +1,7 @@
 version: '3.7'
 
 services:
+  #Base de datos MySQL
   db:
     container_name: mysql_c
     image: ${MYSQL_IMAGE}
@@ -9,19 +10,22 @@ services:
       source: drupaldatabase
       target: /var/lib/mysql
     environment:
+      #Variables de entorno para las credenciales de mysql
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     networks:
       - milocal
+    #Conectar el servicio a fluent-bit para recolectar logs
     logging:
       driver: fluentd
       options:
         fluentd-async-connect: "true"
         fluentd-address: localhost:24224
         tag: bd.logs
-  
+
+  #Servidor web Nginx
   nginx:
     container_name: nginx_c
     image: ${NGINX_IMAGE}
@@ -42,13 +46,15 @@ services:
     depends_on:
       - "php"
       - "fluentd"
+    #Conectar el servicio a fluent-bit para recolectar logs
     logging:
       driver: fluentd
       options:
         fluentd-async-connect: "true"
         fluentd-address: localhost:24224
         tag: nginx.logs
-
+ 
+  #Servicio php drupal + php-fpm
   php:
     container_name: drupal_c
     image: ${DRUPAL_IMAGE}
@@ -57,6 +63,7 @@ services:
       source: staticfiles
       target: /opt/drupal/web
     environment:
+    #Variables de entorno para conectar drupal con la base de datos mysql
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
@@ -68,6 +75,7 @@ services:
       - milocal
     depends_on:
       - "db"
+    #Conectar el servicio a fluent-bit para recolectar logs
     logging:
       driver: fluentd
       options:
@@ -75,32 +83,45 @@ services:
         fluentd-address: localhost:24224
         tag: drupal.logs
 
+  #Plugin de grafana que recoge los logs de fluent-bit y permite visualizarlos en Grafana
   loki:
-    image: grafana/loki
+    image: grafana/loki:2.0.0
     container_name: loki
+    volumes:
+      - ./config/loki.yaml:/etc/config/loki.yaml
     ports:
-      - "3100:3100" 
+      - "3100:3100"
     networks:
       - milocal
-
-
+  
+  #Fluent-bit, recolector y reenviador de registros.  
   fluentd:
     container_name: fluentd
+    # Imagen específica de fluent-bit para Loki+Grafana
     image: grafana/fluent-bit-plugin-loki
     ports:
       - 24224:24224
       - 24224:24224/udp
+      - 2020:2020
     environment:
+      #Url necesaria para conectar con Loki
       LOKI_URL: http://loki:3100/loki/api/v1/push
     volumes:
+      # Fichero de configuración principal de fluent-bit
       - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+      # Fichero de configuración para parsers
+      - ./fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf
+      # Directorio para ficheros proporcionados por calyptia cloud
+      - ./fluent-bit/calyptia:/tmp/storage
     networks:
       - milocal
-
+  
+  #Herramienta de monitoreo. Visualización de Logs
   grafana:
     image: grafana/grafana:7.2.2
     container_name: grafana
     environment:
+      #Credenciales para entrar en Grafana
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
     ports:
@@ -110,8 +131,10 @@ services:
     depends_on:
       - loki
     volumes:
+      # Fichero para proporcionar el datasource (conexión a Loki)
       - ./grafana/configs/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
-      
+
+#Volúmenes para ficheros estáticos (Drupal y MySQL) 
 volumes:
   staticfiles:
     driver: local
@@ -125,7 +148,7 @@ volumes:
       type: none
       device: ./storage/mysql
       o: bind
-
+#Red local
 networks:
   milocal:
     driver: bridge
