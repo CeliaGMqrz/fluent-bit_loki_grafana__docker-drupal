@@ -15,6 +15,10 @@ Se compone de:
 * Loki
 * Grafana
 
+## Gráfico 
+
+![local_draw.png](images/local_draw.png)
+
 ### Requisitos 
 
 - Docker y Docker Compose instalados
